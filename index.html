@@ -1,0 +1,1313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PR Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a triage desk. Sticky header + tabs, status summary strip, PRs grouped by personal status. */
+:root {
+  color-scheme: light;
+  --bg: #eef1f4;
+  --surface: #fbfcfd;
+  --sunken: #e4e8ed;
+  --ink: #17212b;
+  --muted: #5a6773;
+  --line: #d6dce3;
+  --focus: #2d4fd6;
+  --btn: #17212b;
+  --btn-ink: #fbfcfd;
+
+  --red: #b42318;    --red-bg: #fde8e6;
+  --amber: #8f5600;  --amber-bg: #fcefd2;
+  --violet: #6b3fc4; --violet-bg: #efe8fc;
+  --blue: #1f55c9;   --blue-bg: #e2ebfd;
+  --teal: #0b716c;   --teal-bg: #d9f1ef;
+  --green: #2a722e;  --green-bg: #e0f1e1;
+  --pink: #a8295f;   --pink-bg: #fae3ed;
+  --grey: #4f5b67;   --grey-bg: #e6eaef;
+
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --radius: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0e1318; --surface: #151c23; --sunken: #0b1015; --ink: #e4ebf2; --muted: #93a0ad;
+    --line: #26303a; --focus: #8fb0ff; --btn: #e4ebf2; --btn-ink: #0e1318;
+    --red: #ff8f85;    --red-bg: #3b1b19;
+    --amber: #f1bf62;  --amber-bg: #372a12;
+    --violet: #c5abff; --violet-bg: #2a2141;
+    --blue: #93b4ff;   --blue-bg: #1a2744;
+    --teal: #6fd3cc;   --teal-bg: #11302e;
+    --green: #8fd594;  --green-bg: #17301a;
+    --pink: #ff9dc7;   --pink-bg: #3a1a2a;
+    --grey: #b3bec9;   --grey-bg: #222b34;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 14px/1.45 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+[hidden] { display: none !important; }
+a { color: inherit; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); font-size: 12.5px; }
+.muted { color: var(--muted); }
+
+.tone-red    { --c: var(--red);    --cbg: var(--red-bg); }
+.tone-amber  { --c: var(--amber);  --cbg: var(--amber-bg); }
+.tone-violet { --c: var(--violet); --cbg: var(--violet-bg); }
+.tone-blue   { --c: var(--blue);   --cbg: var(--blue-bg); }
+.tone-teal   { --c: var(--teal);   --cbg: var(--teal-bg); }
+.tone-green  { --c: var(--green);  --cbg: var(--green-bg); }
+.tone-pink   { --c: var(--pink);   --cbg: var(--pink-bg); }
+.tone-grey   { --c: var(--grey);   --cbg: var(--grey-bg); }
+
+.wrap { max-width: 1100px; margin: 0 auto; padding-inline: 20px; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: 6px; padding: 6px 12px; cursor: pointer; white-space: nowrap;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--btn); color: var(--btn-ink); border-color: var(--btn); font-weight: 600; }
+.btn.danger { color: var(--red); }
+.btn.small { padding: 3px 8px; font-size: 12.5px; }
+.btn:disabled { opacity: .5; cursor: default; }
+.linkbtn { background: none; border: 0; padding: 0; cursor: pointer; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.linkbtn:hover { color: var(--ink); }
+
+/* Header */
+header.top {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.top-row { display: flex; align-items: center; gap: 12px; padding-block: 12px; flex-wrap: wrap; }
+.brand { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -0.01em; margin: 0; }
+.who { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.who img { width: 22px; height: 22px; border-radius: 50%; }
+.top-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.synced { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.synced.stale { color: var(--amber); }
+
+.tabs { display: flex; gap: 4px; }
+.tab {
+  background: none; border: 0; border-bottom: 2px solid transparent;
+  padding: 8px 12px 10px; cursor: pointer; color: var(--muted); font-weight: 500;
+  display: inline-flex; gap: 8px; align-items: baseline;
+}
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.tab .count { font-family: var(--font-mono); font-size: 12px; background: var(--sunken); border-radius: 10px; padding: 1px 7px; font-variant-numeric: tabular-nums; }
+
+/* Banners */
+.banner { margin-top: 16px; padding: 10px 14px; border-radius: var(--radius); background: var(--cbg); color: var(--c); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.banner p { margin: 0; flex: 1 1 260px; }
+
+/* Summary strip */
+.summary { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 18px 6px; }
+.chip-f {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
+  padding: 5px 12px 5px 10px; cursor: pointer; font-size: 13px;
+}
+.chip-f .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--muted)); }
+.chip-f .n { font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.chip-f[aria-pressed="true"] { background: var(--cbg, var(--sunken)); border-color: var(--c, var(--ink)); color: var(--c, var(--ink)); }
+.chip-f[aria-pressed="true"] .n { color: inherit; }
+.chip-f.zero { opacity: .55; }
+
+/* Toolbar */
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding-block: 10px 4px; }
+.toolbar input[type="search"], .toolbar select {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 6px 10px; min-width: 0;
+}
+.toolbar input[type="search"] { flex: 1 1 220px; }
+.toolbar select { flex: 0 1 240px; }
+.toolbar select.range-select { flex: 0 1 220px; }
+.loading-line { display: flex; align-items: center; gap: 8px; margin-top: 22px; }
+.daterange { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; color: var(--muted); }
+.daterange input { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 5px 8px; font-variant-numeric: tabular-nums; }
+
+/* Groups */
+main { padding-block: 8px 60px; }
+.group { margin-top: 22px; }
+.group-h {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  background: none; border: 0; padding: 4px 0 8px; cursor: pointer; text-align: left;
+}
+.group-h h2 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 16px; letter-spacing: -0.005em; }
+.group-h .dot { width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
+.group-h .n { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.group-h .caret { margin-left: auto; color: var(--muted); font-size: 12px; transition: transform .15s; }
+.group.collapsed .caret { transform: rotate(-90deg); }
+.group.collapsed .list { display: none; }
+.list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+
+.pr {
+  display: grid; grid-template-columns: 240px minmax(0, 1fr) auto; gap: 6px 16px;
+  padding: 12px 14px; border-top: 1px solid var(--line); align-items: start;
+}
+.pr:first-child { border-top: 0; }
+.pr.closed { opacity: .72; }
+.pr-main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.pr-ref { color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: baseline; }
+.pr-title { font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.pr-title:hover { text-decoration: underline; text-underline-offset: 2px; }
+.pr-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.gh {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12px; line-height: 1;
+  padding: 4px 7px; border-radius: 4px; background: var(--cbg, var(--sunken)); color: var(--c, var(--muted));
+}
+.gh svg { width: 12px; height: 12px; }
+.diff { font-family: var(--font-mono); font-size: 12px; display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
+.diff .add { color: var(--green); } .diff .del { color: var(--red); }
+.pr-meta { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pr-meta img { width: 20px; height: 20px; border-radius: 50%; }
+
+.pill {
+  width: 100%; appearance: none; -webkit-appearance: none; cursor: pointer;
+  border: 1px solid transparent; border-radius: 999px; padding: 5px 28px 5px 12px;
+  background: var(--cbg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 11px center;
+  color: var(--c); font-weight: 600; font-size: 13px;
+  text-overflow: ellipsis; white-space: nowrap; overflow: hidden;
+}
+.pill.suggested { background-color: transparent; border: 1px dashed var(--c); font-weight: 500; font-style: italic; }
+.pill option { color: var(--ink); background: var(--surface); font-style: normal; }
+.suggest-hint { font-size: 11.5px; color: var(--muted); margin-top: 4px; padding-left: 12px; }
+
+.note { font-size: 13px; color: var(--ink); background: var(--sunken); border-radius: 5px; padding: 5px 9px; margin-top: 4px; cursor: text; overflow-wrap: anywhere; }
+.note-input { width: 100%; margin-top: 4px; border: 1px solid var(--focus); border-radius: 5px; padding: 5px 9px; background: var(--surface); font-size: 13px; }
+.addnote { font-size: 12.5px; margin-top: 2px; align-self: flex-start; }
+
+.pr-actions { display: flex; gap: 16px; flex-wrap: wrap; }
+.pr.flash { animation: flash 1.8s ease-out; }
+@keyframes flash { from { background: var(--teal-bg); } to { background: transparent; } }
+
+.addbar { margin-top: 16px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); display: flex; flex-direction: column; gap: 8px; }
+.addbar label { font-weight: 600; }
+.addrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.addrow input { flex: 1 1 320px; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; background: var(--bg); font-family: var(--font-mono); font-size: 13px; }
+.addbar .err { margin-top: 0; }
+
+.empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+.empty h2 { font-family: var(--font-display); color: var(--ink); font-weight: 600; margin: 0 0 6px; }
+
+/* Setup */
+.setup { max-width: 640px; margin: 48px auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 28px; }
+.setup h1 { font-family: var(--font-display); font-size: 30px; margin: 0 0 6px; letter-spacing: -0.015em; text-wrap: balance; }
+.setup p { margin: 0 0 14px; max-width: 62ch; }
+.setup ol { padding-left: 20px; margin: 0 0 18px; display: grid; gap: 6px; }
+.setup code { font-family: var(--font-mono); font-size: 12.5px; background: var(--sunken); padding: 1px 5px; border-radius: 4px; }
+.perm { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; background: var(--sunken); border-radius: 8px; padding: 12px 14px; margin: 0 0 18px; font-size: 13px; }
+.perm dt { font-weight: 600; } .perm dd { margin: 0; color: var(--muted); }
+.tokenrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.tokenrow input { flex: 1 1 280px; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; background: var(--bg); font-family: var(--font-mono); font-size: 13px; }
+.err { color: var(--red); margin-top: 10px; }
+.fine { font-size: 12.5px; color: var(--muted); margin-top: 14px; }
+
+/* Settings drawer */
+.scrim { position: fixed; inset: 0; background: rgba(8, 12, 16, .35); z-index: 30; }
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100%); z-index: 31;
+  background: var(--surface); border-left: 1px solid var(--line); overflow-y: auto;
+  padding: 20px; display: flex; flex-direction: column; gap: 22px;
+}
+.drawer h2 { font-family: var(--font-display); margin: 0; font-size: 20px; }
+.drawer h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; }
+.st-list { display: flex; flex-direction: column; gap: 8px; }
+.st-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) 96px auto; gap: 8px; align-items: center; }
+.st-row .dot { width: 12px; height: 12px; border-radius: 3px; background: var(--c); }
+.st-row input, .st-row select { border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; background: var(--bg); min-width: 0; width: 100%; }
+.st-row .ops { display: flex; gap: 2px; }
+.iconbtn { border: 1px solid transparent; background: none; border-radius: 5px; padding: 3px 6px; cursor: pointer; color: var(--muted); }
+.iconbtn:hover { border-color: var(--line); color: var(--ink); }
+.iconbtn.confirm { color: var(--red); border-color: var(--red); font-size: 12px; }
+.drawer .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.drawer p { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 40;
+  background: var(--btn); color: var(--btn-ink); padding: 8px 14px; border-radius: 6px; font-size: 13px;
+  max-width: calc(100% - 32px);
+}
+
+.spin { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.5s; } .group-h .caret { transition: none; } .pr.flash { animation: none; outline: 2px solid var(--teal); } }
+
+@media (max-width: 720px) {
+  .wrap { padding-inline: 16px; }
+  .pr { grid-template-columns: minmax(0, 1fr); }
+  .pr-status { max-width: 260px; }
+  .pr-meta { order: 3; }
+  .setup { margin: 20px auto; padding: 20px; }
+}
+</style>
+</head>
+<body>
+
+<section id="setup" class="wrap" hidden>
+  <div class="setup">
+    <h1>PR Board</h1>
+    <p>Every open PR you wrote and every PR waiting on your review, in one list. You tag each one with your own status, like <em>Testing pending by me</em>, and it stays with you across devices.</p>
+    <p>It needs a GitHub token. Create one here:</p>
+    <ol>
+      <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → Fine-grained tokens → Generate new token</a>.</li>
+      <li><strong>Resource owner:</strong> the org your PRs live in. <strong>Repository access:</strong> All repositories.</li>
+      <li>Set these permissions, then generate and copy the token:</li>
+    </ol>
+    <dl class="perm">
+      <dt>Pull requests</dt><dd>Read-only. Lists your PRs and review requests.</dd>
+      <dt>Metadata</dt><dd>Read-only. Added automatically.</dd>
+      <dt>Gists</dt><dd>Read and write (under Account permissions). Saves your statuses to a private gist.</dd>
+    </dl>
+    <form id="token-form" class="tokenrow">
+      <label for="token-input" class="muted" hidden>GitHub token</label>
+      <input id="token-input" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_… or ghp_…">
+      <button class="btn primary" type="submit" id="token-submit">Connect</button>
+    </form>
+    <div id="token-err" class="err" hidden></div>
+    <p class="fine">The token is stored only in this browser and is sent only to api.github.com. PRs across several orgs? Use a classic token with the <code>repo</code> and <code>gist</code> scopes instead, since a fine-grained token covers one org.</p>
+  </div>
+</section>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="wrap">
+      <div class="top-row">
+        <h1 class="brand">PR Board</h1>
+        <span class="who" id="who"></span>
+        <div class="top-actions">
+          <span class="synced" id="synced"></span>
+          <button class="btn primary" id="open-add" type="button">Add PR</button>
+          <button class="btn" id="refresh" type="button">Refresh</button>
+          <button class="btn" id="open-settings" type="button">Statuses &amp; settings</button>
+        </div>
+      </div>
+      <nav class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tab-mine" data-tab="mine" type="button">My PRs <span class="count" id="count-mine">0</span></button>
+        <button class="tab" role="tab" id="tab-review" data-tab="review" type="button">Needs my review <span class="count" id="count-review">0</span></button>
+      </nav>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <form id="add-form" class="addbar" hidden>
+      <label for="add-input">Track a PR that isn't on your board</label>
+      <div class="addrow">
+        <input id="add-input" type="text" autocomplete="off" spellcheck="false" placeholder="https://github.com/owner/repo/pull/123 or owner/repo#123">
+        <button class="btn primary" type="submit" id="add-submit">Add</button>
+        <button class="btn" type="button" id="add-cancel">Cancel</button>
+      </div>
+      <div id="add-err" class="err" hidden></div>
+    </form>
+    <div id="banner"></div>
+    <div class="summary" id="summary"></div>
+    <div class="toolbar">
+      <label for="search" hidden>Search</label>
+      <input id="search" type="search" placeholder="Search title, repo, author, branch…">
+      <label for="repo" hidden>Repository</label>
+      <select id="repo"><option value="">All repositories</option></select>
+      <label for="closed-range" hidden>Closed PRs</label>
+      <select id="closed-range" class="range-select">
+        <option value="off">Hide closed PRs</option>
+        <option value="7">Closed: last 7 days</option>
+        <option value="14">Closed: last 14 days</option>
+        <option value="30">Closed: last 30 days</option>
+        <option value="this_month">Closed: this month</option>
+        <option value="last_month">Closed: last month</option>
+        <option value="custom">Closed: custom dates…</option>
+      </select>
+      <span id="custom-range" class="daterange" hidden>
+        <label for="closed-from">From</label>
+        <input id="closed-from" type="date">
+        <label for="closed-to">to</label>
+        <input id="closed-to" type="date">
+      </span>
+    </div>
+    <main id="list"></main>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-label="Statuses and settings">
+  <div class="drawer-head">
+    <h2>Statuses &amp; settings</h2>
+    <button class="iconbtn" id="close-settings" type="button" aria-label="Close">✕</button>
+  </div>
+  <section>
+    <h3>Your statuses</h3>
+    <p>Rename, recolor or reorder. Groups on the board follow this order.</p>
+    <div class="st-list" id="st-list"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn small" id="add-status" type="button">Add status</button>
+      <button class="linkbtn" id="reset-statuses" type="button">Reset to defaults</button>
+    </div>
+  </section>
+  <section>
+    <h3>Where your data lives</h3>
+    <p id="store-info"></p>
+  </section>
+  <section>
+    <h3>Token</h3>
+    <p>Stored only in this browser. Remove it here, and revoke it on GitHub if you no longer need it.</p>
+    <div class="row"><button class="btn danger small" id="forget-token" type="button">Forget token on this browser</button></div>
+  </section>
+</aside>
+
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script>
+"use strict";
+const GIST_FILE = "pr-board-status.json";
+const TONES = ["red", "amber", "violet", "blue", "teal", "green", "pink", "grey"];
+const DEFAULT_STATUSES = [
+  { key: "pending_me", label: "Pending on me", tone: "red" },
+  { key: "test_before_review", label: "Testing pending before review", tone: "amber" },
+  { key: "test_me", label: "Testing pending by me", tone: "violet" },
+  { key: "in_review", label: "In review", tone: "blue" },
+  { key: "ready", label: "Ready to merge", tone: "green" },
+  { key: "blocked", label: "Blocked", tone: "pink" },
+  { key: "done", label: "Done", tone: "grey" },
+];
+
+// ---------- small utils ----------
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+const $ = (id) => document.getElementById(id);
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  if (props) for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k === "text") el.textContent = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat()) {
+    if (c == null || c === false) continue;
+    el.append(c.nodeType ? c : document.createTextNode(String(c)));
+  }
+  return el;
+}
+function ago(iso) {
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "just now";
+  const m = s / 60; if (m < 60) return Math.floor(m) + "m ago";
+  const hr = m / 60; if (hr < 24) return Math.floor(hr) + "h ago";
+  const d = hr / 24; if (d < 30) return Math.floor(d) + "d ago";
+  return new Date(iso).toLocaleDateString();
+}
+let toastTimer;
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
+}
+function slug(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40) || "status"; }
+
+// ---------- state ----------
+const S = {
+  token: LS.get("prb.token", null),
+  viewer: LS.get("prb.viewer", null),
+  data: LS.get("prb.cache", null),          // { mine:[], review:[], closed:[], fetchedAt }
+  loading: false,
+  fetchError: null,
+  tab: LS.get("prb.tab", "mine"),
+  // Closed PR window: off | 7 | 14 | 30 | this_month | last_month | custom (from/to are YYYY-MM-DD)
+  closedRange: LS.get("prb.closedRange", null) || { mode: LS.get("prb.showClosed", false) ? "14" : "off", from: "", to: "" },
+  query: "",
+  repo: "",
+  statusFilter: null,
+  collapsed: LS.get("prb.collapsed", {}),
+  store: LS.get("prb.store", null) || { version: 1, statuses: DEFAULT_STATUSES.slice(), prs: {} },
+  storeMode: "loading",                     // loading | gist | local
+  storeError: null,
+  trackMissing: [],                         // PRs added by link that GitHub couldn't return
+  closedLoading: false,
+  closedError: null,
+  gistId: LS.get("prb.gist", null),
+  gistUrl: null,
+  editingNote: null,
+  pendingRender: false,
+};
+
+// ---------- GitHub API ----------
+class ApiError extends Error {
+  constructor(kind, message, extra) { super(message); this.kind = kind; Object.assign(this, extra); }
+}
+async function ghFetch(url, opts = {}) {
+  let r;
+  try {
+    r = await fetch(url, {
+      ...opts,
+      headers: {
+        Authorization: "Bearer " + S.token,
+        Accept: "application/vnd.github+json",
+        ...(opts.body ? { "Content-Type": "application/json" } : {}),
+      },
+    });
+  } catch (e) {
+    throw new ApiError("network", "Couldn't reach GitHub. Check your connection.");
+  }
+  if (r.status === 401) throw new ApiError("auth", "GitHub rejected the token. It may be expired or revoked.");
+  if ((r.status === 403 || r.status === 429) && r.headers.get("x-ratelimit-remaining") === "0") {
+    const reset = Number(r.headers.get("x-ratelimit-reset")) * 1000;
+    throw new ApiError("rate", "GitHub rate limit reached. Try again at " + new Date(reset).toLocaleTimeString() + ".");
+  }
+  if (!r.ok) {
+    let msg = "GitHub returned " + r.status + ".";
+    try { const j = await r.json(); if (j.message) msg = j.message; } catch {}
+    throw new ApiError("http", msg, { status: r.status });
+  }
+  return r.status === 204 ? null : r.json();
+}
+
+const PR_FIELDS = `
+fragment F on PullRequest {
+  id number title url state isDraft reviewDecision mergeable updatedAt closedAt mergedAt
+  additions deletions headRefName
+  repository { nameWithOwner }
+  author { login avatarUrl }
+  commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+}`;
+// PRs added by link are fetched in the same request, one aliased lookup each (t0, t1, …).
+function buildPRQuery(tracked) {
+  const decl = tracked.map((_, i) => `, $o${i}: String!, $r${i}: String!, $n${i}: Int!`).join("");
+  const sel = tracked.map((_, i) => `  t${i}: repository(owner: $o${i}, name: $r${i}) { pullRequest(number: $n${i}) { ...F } }`).join("\n");
+  return `
+query($mine: String!, $requested: String!, $reviewed: String!${decl}) {
+  viewer { login avatarUrl }
+  mine: search(type: ISSUE, first: 100, query: $mine) { nodes { ...F } }
+  requested: search(type: ISSUE, first: 100, query: $requested) { nodes { ...F } }
+  reviewed: search(type: ISSUE, first: 100, query: $reviewed) { nodes { ...F } }
+${sel}
+}` + PR_FIELDS;
+}
+// Closed PRs load separately and skip CI/mergeable fields (not shown for closed PRs):
+// with them, 100-result pages over long ranges time out on GitHub's side.
+const CLOSED_QUERY = `
+query($q: String!, $after: String) {
+  search(type: ISSUE, first: 100, query: $q, after: $after) { issueCount pageInfo { hasNextPage endCursor } nodes { ...C } }
+}
+fragment C on PullRequest {
+  id number title url state isDraft updatedAt closedAt mergedAt
+  additions deletions headRefName
+  repository { nameWithOwner }
+  author { login avatarUrl }
+}`;
+const CLOSED_MAX = 500;
+
+// ---------- closed PR date window ----------
+function ymd(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function fmtDay(s) {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+// Returns { from, to, label } (dates as YYYY-MM-DD, either may be "") or null when closed PRs are hidden.
+function closedWindow() {
+  const r = S.closedRange, now = new Date();
+  const daysAgo = (n) => { const d = new Date(now); d.setDate(d.getDate() - n); return ymd(d); };
+  switch (r.mode) {
+    case "7": case "14": case "30":
+      return { from: daysAgo(Number(r.mode)), to: "", label: "last " + r.mode + " days" };
+    case "this_month":
+      return { from: ymd(new Date(now.getFullYear(), now.getMonth(), 1)), to: "", label: "this month" };
+    case "last_month": {
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 0);
+      return { from: ymd(start), to: ymd(end), label: start.toLocaleDateString(undefined, { month: "long", year: "numeric" }) };
+    }
+    case "custom": {
+      let { from, to } = r;
+      if (!from && !to) return null;
+      if (from && to && from > to) [from, to] = [to, from];
+      const label = from && to ? fmtDay(from) + " – " + fmtDay(to) : from ? "since " + fmtDay(from) : "until " + fmtDay(to);
+      return { from, to, label };
+    }
+    default:
+      return null;
+  }
+}
+function closedQualifier(w) { return w.from && w.to ? w.from + ".." + w.to : w.from ? ">=" + w.from : "<=" + w.to; }
+function inWindow(pr, w) {
+  const day = ymd(new Date(pr.mergedAt || pr.closedAt || pr.updatedAt));
+  return (!w.from || day >= w.from) && (!w.to || day <= w.to);
+}
+const ONE_PR_QUERY = `
+query($o: String!, $r: String!, $n: Int!) {
+  viewer { login }
+  repository(owner: $o, name: $r) { pullRequest(number: $n) { ...F } }
+}` + PR_FIELDS;
+
+function trackedRef(t) { return t.owner + "/" + t.repo + "#" + t.number; }
+function parsePrRef(s) {
+  s = s.trim();
+  const m = s.match(/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/i) || s.match(/^([\w.-]+)\/([\w.-]+)#(\d+)$/);
+  return m ? { owner: m[1], repo: m[2], number: Number(m[3]) } : null;
+}
+
+function normalize(n, extra) {
+  if (!n || !n.id) return null;
+  return {
+    id: n.id, number: n.number, title: n.title, url: n.url, state: n.state,
+    isDraft: n.isDraft, reviewDecision: n.reviewDecision, mergeable: n.mergeable,
+    updatedAt: n.updatedAt, closedAt: n.closedAt, mergedAt: n.mergedAt,
+    additions: n.additions, deletions: n.deletions, branch: n.headRefName,
+    repo: n.repository ? n.repository.nameWithOwner : "",
+    author: n.author ? n.author.login : "ghost",
+    avatar: n.author ? n.author.avatarUrl : "",
+    ci: n.commits && n.commits.nodes[0] && n.commits.nodes[0].commit.statusCheckRollup ? n.commits.nodes[0].commit.statusCheckRollup.state : null,
+    ...extra,
+  };
+}
+
+// Open PRs plus every PR added by link. Searched closed PRs come from fetchClosed().
+async function fetchPRs() {
+  const tracked = S.store.tracked;
+  const variables = {
+    mine: "is:pr is:open author:@me archived:false",
+    requested: "is:pr is:open review-requested:@me archived:false",
+    reviewed: "is:pr is:open reviewed-by:@me -author:@me archived:false",
+  };
+  tracked.forEach((t, i) => { variables["o" + i] = t.owner; variables["r" + i] = t.repo; variables["n" + i] = t.number; });
+  const j = await ghFetch("https://api.github.com/graphql", {
+    method: "POST",
+    body: JSON.stringify({ query: buildPRQuery(tracked), variables }),
+  });
+  if (j.errors && !j.data) throw new ApiError("gql", j.errors[0].message);
+  const d = j.data;
+  const me = d.viewer.login;
+  const mine = d.mine.nodes.map((n) => normalize(n, { kind: "mine" })).filter(Boolean);
+  const reviewMap = new Map();
+  for (const n of d.reviewed.nodes) { const p = normalize(n, { kind: "review", requested: false }); if (p) reviewMap.set(p.id, p); }
+  for (const n of d.requested.nodes) { const p = normalize(n, { kind: "review", requested: true }); if (p) reviewMap.set(p.id, p); }
+  const closed = [];
+
+  // Merge PRs added by link, skipping any the searches already returned.
+  const seen = new Set([...mine, ...reviewMap.values()].map((p) => p.id));
+  const missing = [];
+  tracked.forEach((t, i) => {
+    const node = d["t" + i] && d["t" + i].pullRequest;
+    if (!node) { missing.push(t); return; }
+    const p = placeTracked(normalize(node, { tracked: true, requested: false }), me);
+    if (seen.has(p.id)) return;
+    seen.add(p.id);
+    if (p.state !== "OPEN") closed.push(p);
+    else if (p.kind === "mine") mine.push(p);
+    else reviewMap.set(p.id, p);
+  });
+  return { viewer: d.viewer, missing, data: { mine, review: [...reviewMap.values()], closed, closedTotal: 0, closedKey: "", fetchedAt: new Date().toISOString() } };
+}
+
+// Closed PRs in a date window, newest activity first; follows the cursor up to CLOSED_MAX.
+async function fetchClosed(win, me) {
+  const q = "is:pr is:closed involves:@me sort:updated-desc closed:" + closedQualifier(win);
+  const nodes = [];
+  let after = null, total = 0;
+  do {
+    const j = await ghFetch("https://api.github.com/graphql", {
+      method: "POST",
+      body: JSON.stringify({ query: CLOSED_QUERY, variables: { q, after } }),
+    });
+    if (!j.data || !j.data.search) throw new ApiError("gql", j.errors ? j.errors[0].message : "GitHub returned no data.");
+    const s = j.data.search;
+    total = s.issueCount;
+    nodes.push(...s.nodes);
+    after = s.pageInfo.hasNextPage ? s.pageInfo.endCursor : null;
+  } while (after && nodes.length < CLOSED_MAX);
+  const list = nodes
+    .map((n) => normalize(n, { kind: n.author && n.author.login === me ? "mine" : "review", requested: false }))
+    .filter(Boolean);
+  return { list, total };
+}
+
+function placeTracked(p, me) {
+  p.kind = p.author === me ? "mine" : "review";
+  return p;
+}
+
+async function fetchOnePR(t) {
+  const j = await ghFetch("https://api.github.com/graphql", {
+    method: "POST",
+    body: JSON.stringify({ query: ONE_PR_QUERY, variables: { o: t.owner, r: t.repo, n: t.number } }),
+  });
+  const node = j.data && j.data.repository && j.data.repository.pullRequest;
+  if (!node) return null;
+  return placeTracked(normalize(node, { tracked: true, requested: false }), j.data.viewer.login);
+}
+
+// ---------- status store (private gist, mirrored to localStorage) ----------
+function cleanStore(raw) {
+  const st = raw && typeof raw === "object" ? raw : {};
+  const statuses = Array.isArray(st.statuses) && st.statuses.length
+    ? st.statuses.filter((s) => s && s.key && s.label).map((s) => ({ key: String(s.key), label: String(s.label), tone: TONES.includes(s.tone) ? s.tone : "grey" }))
+    : DEFAULT_STATUSES.slice();
+  const tracked = Array.isArray(st.tracked)
+    ? st.tracked.filter((t) => t && t.owner && t.repo && Number.isInteger(t.number)).slice(0, 50)
+    : [];
+  return { version: 1, statuses, prs: st.prs && typeof st.prs === "object" ? st.prs : {}, tracked };
+}
+
+async function loadGist() {
+  if (S.gistId) {
+    try { return await ghFetch("https://api.github.com/gists/" + S.gistId); }
+    catch (e) { if (e.status !== 404) throw e; S.gistId = null; LS.del("prb.gist"); }
+  }
+  for (let page = 1; page <= 10; page++) {
+    const list = await ghFetch("https://api.github.com/gists?per_page=100&page=" + page);
+    const g = list.find((x) => x.files && x.files[GIST_FILE]);
+    if (g) { S.gistId = g.id; LS.set("prb.gist", g.id); return ghFetch("https://api.github.com/gists/" + g.id); }
+    if (list.length < 100) break;
+  }
+  return null;
+}
+
+async function syncStoreFromGist() {
+  if (saveQueued || saving) return; // don't clobber unsaved local edits
+  try {
+    const g = await loadGist();
+    if (g) {
+      S.gistUrl = g.html_url;
+      const f = g.files[GIST_FILE];
+      let content = f.content;
+      if (f.truncated) content = await (await fetch(f.raw_url)).text();
+      const remote = cleanStore(JSON.parse(content || "{}"));
+      S.store = dirty ? mergeStores(remote, S.store) : remote;
+      LS.set("prb.store", S.store);
+    }
+    S.storeMode = "gist"; S.storeError = null;
+    if (dirty) flushSave(); // push edits that an earlier failed save left behind
+  } catch (e) {
+    S.storeMode = "local";
+    S.storeError = e.kind === "http" && (e.status === 403 || e.status === 404)
+      ? "Your token can't access gists, so statuses are saved only in this browser. Add the Gists (read and write) permission to sync them across devices."
+      : "Couldn't load your statuses from GitHub (" + e.message + "). Showing the copy saved in this browser.";
+  }
+}
+
+// Combine the gist with local edits that never reached it: newest edit per PR wins.
+function mergeStores(remote, local) {
+  const prs = { ...remote.prs };
+  for (const [id, m] of Object.entries(local.prs)) {
+    if (!prs[id] || (m.updatedAt || "") >= (prs[id].updatedAt || "")) prs[id] = m;
+  }
+  const statuses = [...remote.statuses, ...local.statuses.filter((s) => !remote.statuses.some((r) => r.key === s.key))];
+  const tracked = [...remote.tracked, ...local.tracked.filter((t) => !remote.tracked.some((r) => trackedRef(r) === trackedRef(t)))];
+  return { version: 1, statuses, prs, tracked };
+}
+
+let saveTimer = null, saveQueued = false, saving = false;
+let dirty = LS.get("prb.dirty", false);     // local edits not yet saved to the gist
+function setDirty(v) { dirty = v; LS.set("prb.dirty", v); }
+function saveStore() {
+  LS.set("prb.store", S.store);
+  setDirty(true);
+  if (S.storeMode !== "gist") return;
+  saveQueued = true;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushSave, 700);
+}
+async function flushSave() {
+  if (saving) { saveTimer = setTimeout(flushSave, 400); return; }
+  saving = true; saveQueued = false;
+  const body = { files: { [GIST_FILE]: { content: JSON.stringify(S.store, null, 2) } } };
+  try {
+    if (S.gistId) {
+      await ghFetch("https://api.github.com/gists/" + S.gistId, { method: "PATCH", body: JSON.stringify(body) });
+    } else {
+      const g = await ghFetch("https://api.github.com/gists", {
+        method: "POST",
+        body: JSON.stringify({ description: "PR Board: personal PR statuses (private)", public: false, ...body }),
+      });
+      S.gistId = g.id; S.gistUrl = g.html_url; LS.set("prb.gist", g.id);
+    }
+    S.storeError = null;
+    if (!saveQueued) setDirty(false);
+  } catch (e) {
+    S.storeError = "Couldn't save to your gist (" + e.message + "). Changes are kept in this browser and will save on the next refresh.";
+  } finally {
+    saving = false;
+    renderBanner(); renderStoreInfo();
+  }
+}
+
+// ---------- status logic ----------
+function statusByKey(key) { return S.store.statuses.find((s) => s.key === key); }
+function suggestKey(pr) {
+  let k;
+  if (pr.state !== "OPEN") k = "done";
+  else if (pr.kind === "mine") {
+    if (pr.isDraft) k = "test_before_review";
+    else if (pr.reviewDecision === "CHANGES_REQUESTED") k = "pending_me";
+    else if (pr.reviewDecision === "APPROVED") k = "ready";
+    else k = "in_review";
+  } else k = pr.requested || pr.tracked ? "pending_me" : "in_review";
+  return statusByKey(k) ? k : S.store.statuses[0].key;
+}
+function effective(pr) {
+  const mark = S.store.prs[pr.id];
+  if (mark && mark.status && statusByKey(mark.status)) return { key: mark.status, suggested: false };
+  return { key: suggestKey(pr), suggested: true };
+}
+function setMark(pr, patch) {
+  const prev = S.store.prs[pr.id] || {};
+  const next = { ...prev, ...patch, ref: pr.repo + "#" + pr.number, updatedAt: new Date().toISOString() };
+  if (!next.status) delete next.status;
+  if (!next.note) delete next.note;
+  if (!next.status && !next.note) delete S.store.prs[pr.id];
+  else S.store.prs[pr.id] = next;
+  pruneMarks();
+  saveStore();
+}
+function pruneMarks() {
+  if (!S.data) return;
+  const live = new Set([...S.data.mine, ...S.data.review, ...S.data.closed].map((p) => p.id));
+  const cutoff = Date.now() - 180 * 864e5;
+  for (const [id, m] of Object.entries(S.store.prs)) {
+    if (!live.has(id) && new Date(m.updatedAt || 0).getTime() < cutoff) delete S.store.prs[id];
+  }
+}
+
+// ---------- rendering ----------
+const ICON = {
+  check: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/></svg>',
+  x: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/></svg>',
+  dot: '<svg viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="4"/></svg>',
+};
+function ghChip(tone, text, icon) {
+  const el = h("span", { class: "gh" + (tone ? " tone-" + tone : "") });
+  if (icon) el.insertAdjacentHTML("beforeend", ICON[icon]);
+  el.append(text);
+  return el;
+}
+function chipsFor(pr) {
+  const out = [];
+  if (pr.state === "MERGED") out.push(ghChip("violet", "Merged"));
+  else if (pr.state === "CLOSED") out.push(ghChip("grey", "Closed"));
+  if (pr.isDraft) out.push(ghChip("grey", "Draft"));
+  if (pr.tracked) out.push(ghChip("teal", "Added by you"));
+  else if (pr.kind === "review" && pr.state === "OPEN") out.push(pr.requested ? ghChip("red", "Review requested") : ghChip(null, "You reviewed"));
+  if (pr.state === "OPEN") {
+    if (pr.reviewDecision === "APPROVED") out.push(ghChip("green", "Approved", "check"));
+    else if (pr.reviewDecision === "CHANGES_REQUESTED") out.push(ghChip("red", "Changes requested"));
+    else if (pr.reviewDecision === "REVIEW_REQUIRED" && !pr.isDraft) out.push(ghChip(null, "Review required"));
+    if (pr.ci === "SUCCESS") out.push(ghChip("green", "CI passing", "check"));
+    else if (pr.ci === "FAILURE" || pr.ci === "ERROR") out.push(ghChip("red", "CI failing", "x"));
+    else if (pr.ci === "PENDING" || pr.ci === "EXPECTED") out.push(ghChip("amber", "CI running", "dot"));
+    if (pr.mergeable === "CONFLICTING") out.push(ghChip("pink", "Conflicts"));
+  }
+  out.push(h("span", { class: "diff" }, h("span", { class: "add", text: "+" + pr.additions }), h("span", { class: "del", text: "−" + pr.deletions })));
+  return out;
+}
+
+function statusSelect(pr) {
+  const eff = effective(pr);
+  const st = statusByKey(eff.key);
+  const sel = h("select", { class: "pill tone-" + st.tone + (eff.suggested ? " suggested" : ""), id: "st-" + pr.id, "aria-label": "Status for " + pr.repo + " #" + pr.number });
+  if (eff.suggested) sel.append(h("option", { value: "", text: st.label + " (suggested)" }));
+  for (const s of S.store.statuses) sel.append(h("option", { value: s.key, text: s.label }));
+  if (!eff.suggested) sel.append(h("option", { value: "__clear", text: "Clear (use suggestion)" }));
+  sel.value = eff.suggested ? "" : eff.key;
+  sel.addEventListener("change", () => {
+    const v = sel.value;
+    if (v === "") return;
+    setMark(pr, { status: v === "__clear" ? null : v });
+    const label = v === "__clear" ? "Status cleared" : "Marked " + statusByKey(v).label;
+    toast(label + " · " + pr.repo.split("/")[1] + " #" + pr.number);
+    render();
+  });
+  return sel;
+}
+
+function noteEl(pr) {
+  const mark = S.store.prs[pr.id];
+  const note = mark && mark.note;
+  if (S.editingNote === pr.id) {
+    const inp = h("input", { class: "note-input", id: "note-" + pr.id, value: note || "", placeholder: "Note to self, e.g. waiting on staging deploy", maxlength: "300", "aria-label": "Note" });
+    let done = false;
+    const finish = (save) => {
+      if (done) return; done = true;
+      S.editingNote = null;
+      if (save && inp.value.trim() !== (note || "")) setMark(pr, { note: inp.value.trim() || null });
+      render();
+    };
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") finish(true); if (e.key === "Escape") finish(false); });
+    inp.addEventListener("blur", () => finish(true));
+    queueMicrotask(() => inp.focus());
+    return inp;
+  }
+  const open = () => { S.editingNote = pr.id; render(); };
+  if (note) return h("div", { class: "note", tabindex: "0", title: "Edit note", onclick: open, onkeydown: (e) => { if (e.key === "Enter") open(); } }, note);
+  return h("button", { class: "linkbtn addnote", type: "button", onclick: open }, "Add note");
+}
+
+function prRow(pr) {
+  const eff = effective(pr);
+  const status = h("div", { class: "pr-status" }, statusSelect(pr));
+  if (eff.suggested) status.append(h("div", { class: "suggest-hint", text: "Suggested from GitHub state" }));
+  const note = noteEl(pr);
+  const inlineNote = note.classList.contains("addnote");
+  const actions = [inlineNote ? note : null];
+  if (pr.tracked) actions.push(h("button", { class: "linkbtn addnote", type: "button", onclick: () => untrackPR(pr) }, "Stop tracking"));
+  return h("article", { class: "pr" + (pr.state !== "OPEN" ? " closed" : ""), "data-id": pr.id },
+    status,
+    h("div", { class: "pr-main" },
+      h("div", { class: "pr-ref" },
+        h("span", { class: "mono", text: pr.repo }),
+        h("span", { class: "mono", text: "#" + pr.number }),
+        pr.branch ? h("span", { class: "mono", text: "· " + pr.branch }) : null),
+      h("a", { class: "pr-title", href: pr.url, target: "_blank", rel: "noopener", text: pr.title }),
+      h("div", { class: "pr-chips" }, chipsFor(pr)),
+      inlineNote ? null : note,
+      actions.some(Boolean) ? h("div", { class: "pr-actions" }, actions) : null),
+    h("div", { class: "pr-meta" },
+      pr.avatar ? h("img", { src: pr.avatar + (pr.avatar.includes("?") ? "&" : "?") + "s=40", alt: "", loading: "lazy" }) : null,
+      h("span", { text: pr.author }),
+      h("span", { text: "· " + ago(pr.state === "OPEN" ? pr.updatedAt : (pr.mergedAt || pr.closedAt || pr.updatedAt)) })));
+}
+
+function matches(pr) {
+  if (S.repo && pr.repo !== S.repo) return false;
+  if (S.query) {
+    const q = S.query.toLowerCase();
+    const note = (S.store.prs[pr.id] && S.store.prs[pr.id].note) || "";
+    if (![pr.title, pr.repo, pr.author, pr.branch, "#" + pr.number, note].some((s) => s && s.toLowerCase().includes(q))) return false;
+  }
+  return true;
+}
+
+function renderGroup(key, title, tone, items) {
+  const collapsed = !!S.collapsed[S.tab + ":" + key];
+  const g = h("section", { class: "group" + (collapsed ? " collapsed" : "") });
+  const head = h("button", { class: "group-h tone-" + tone, type: "button", "aria-expanded": String(!collapsed) },
+    h("span", { class: "dot" }), h("h2", { text: title }), h("span", { class: "n", text: String(items.length) }), h("span", { class: "caret", text: "▾" }));
+  head.addEventListener("click", () => {
+    S.collapsed[S.tab + ":" + key] = !collapsed; LS.set("prb.collapsed", S.collapsed); render();
+  });
+  g.append(head, h("div", { class: "list" }, items.map(prRow)));
+  return g;
+}
+
+function renderBanner() {
+  const b = $("banner"); b.replaceChildren();
+  if (S.fetchError) {
+    b.append(h("div", { class: "banner tone-red" }, h("p", { text: S.fetchError }), h("button", { class: "btn small", type: "button", onclick: refresh }, "Try again")));
+  }
+  if (S.storeError) b.append(h("div", { class: "banner tone-amber" }, h("p", { text: S.storeError })));
+  if (S.closedError) {
+    b.append(h("div", { class: "banner tone-amber" }, h("p", { text: S.closedError }), h("button", { class: "btn small", type: "button", onclick: loadClosed }, "Try again")));
+  }
+  if (S.trackMissing.length) {
+    const refs = S.trackMissing.map(trackedRef).join(", ");
+    b.append(h("div", { class: "banner tone-amber" },
+      h("p", { text: "Couldn't load " + refs + ". The PR may have been deleted, or your token can't see that repository." }),
+      h("button", { class: "btn small", type: "button", onclick: untrackMissing }, "Stop tracking")));
+  }
+}
+
+function renderStoreInfo() {
+  const el = $("store-info"); el.replaceChildren();
+  if (S.storeMode === "gist") {
+    el.append("Statuses, notes and PRs you added by link are saved in a private gist in your GitHub account, so they follow you to any browser where you use this page. ");
+    if (S.gistUrl) el.append(h("a", { href: S.gistUrl, target: "_blank", rel: "noopener", text: "Open the gist" }), ".");
+    else el.append("The gist is created the first time you set a status.");
+  } else {
+    el.append("Statuses and notes are saved only in this browser. Give your token the Gists (read and write) permission to sync them.");
+  }
+}
+
+function render() {
+  const d = S.data || { mine: [], review: [], closed: [] };
+  $("count-mine").textContent = d.mine.length;
+  $("count-review").textContent = d.review.length;
+  for (const t of document.querySelectorAll(".tab")) t.setAttribute("aria-selected", String(t.dataset.tab === S.tab));
+
+  // who + synced
+  const who = $("who"); who.replaceChildren();
+  if (S.viewer) who.append(h("img", { src: S.viewer.avatarUrl, alt: "" }), h("span", { class: "mono", text: S.viewer.login }));
+  const sy = $("synced");
+  sy.replaceChildren();
+  if (S.loading) sy.append(h("span", { class: "spin", "aria-hidden": "true" }), " Syncing");
+  else if (S.data) { sy.textContent = "Updated " + ago(S.data.fetchedAt); sy.classList.toggle("stale", !!S.fetchError); }
+  $("refresh").disabled = S.loading;
+
+  // Closed PRs in the chosen window. Search results count only if they were fetched for this
+  // exact window; PRs added by link are checked against it here.
+  const win = closedWindow();
+  const winKey = win ? closedQualifier(win) : "";
+  const closedVisible = win ? d.closed.filter((p) => (p.tracked ? inWindow(p, win) : d.closedKey === winKey)) : [];
+
+  // repo filter options
+  const all = [...d.mine, ...d.review, ...closedVisible];
+  const repos = [...new Set(all.map((p) => p.repo))].sort();
+  const rs = $("repo");
+  if (rs.dataset.sig !== repos.join("|")) {
+    rs.replaceChildren(h("option", { value: "", text: "All repositories" }), ...repos.map((r) => h("option", { value: r, text: r })));
+    rs.dataset.sig = repos.join("|");
+  }
+  if (S.repo && !repos.includes(S.repo)) S.repo = "";
+  rs.value = S.repo;
+  $("closed-range").value = S.closedRange.mode;
+  $("custom-range").hidden = S.closedRange.mode !== "custom";
+  $("closed-from").value = S.closedRange.from || "";
+  $("closed-to").value = S.closedRange.to || "";
+  $("closed-from").max = $("closed-to").max = ymd(new Date());
+
+  const open = (S.tab === "mine" ? d.mine : d.review).filter(matches);
+  const closed = closedVisible.filter((p) => p.kind === S.tab).filter(matches);
+
+  // summary strip
+  const counts = {};
+  for (const p of open) { const k = effective(p).key; counts[k] = (counts[k] || 0) + 1; }
+  const sum = $("summary"); sum.replaceChildren();
+  sum.append(h("button", { class: "chip-f", type: "button", "aria-pressed": String(!S.statusFilter), onclick: () => { S.statusFilter = null; render(); } },
+    "All open", h("span", { class: "n", text: String(open.length) })));
+  if (S.statusFilter && !statusByKey(S.statusFilter)) S.statusFilter = null;
+  for (const s of S.store.statuses) {
+    const n = counts[s.key] || 0;
+    sum.append(h("button", {
+      class: "chip-f tone-" + s.tone + (n ? "" : " zero"), type: "button", "aria-pressed": String(S.statusFilter === s.key),
+      onclick: () => { S.statusFilter = S.statusFilter === s.key ? null : s.key; render(); },
+    }, h("span", { class: "dot" }), s.label, h("span", { class: "n", text: String(n) })));
+  }
+
+  // list
+  const list = $("list"); list.replaceChildren();
+  if (!S.data && S.loading) {
+    list.append(h("div", { class: "empty" }, h("h2", { text: "Loading your pull requests" }), h("p", { text: "Fetching from GitHub…" })));
+    return;
+  }
+  const byUpdated = (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt);
+  let any = false;
+  for (const s of S.store.statuses) {
+    if (S.statusFilter && S.statusFilter !== s.key) continue;
+    const items = open.filter((p) => effective(p).key === s.key).sort(byUpdated);
+    if (!items.length) continue;
+    any = true;
+    list.append(renderGroup(s.key, s.label, s.tone, items));
+  }
+  if (closed.length && !S.statusFilter) {
+    any = true;
+    const closedOn = (p) => new Date(p.mergedAt || p.closedAt || p.updatedAt);
+    list.append(renderGroup("__closed", "Closed or merged · " + win.label, "grey", closed.sort((a, b) => closedOn(b) - closedOn(a))));
+  }
+  if (win && S.closedLoading && !S.statusFilter) {
+    any = true;
+    list.append(h("p", { class: "fine loading-line" }, h("span", { class: "spin", "aria-hidden": "true" }), " Loading closed PRs · " + win.label + "…"));
+  }
+  if (win && d.closedKey === winKey && d.closedTotal > CLOSED_MAX && !S.statusFilter) {
+    list.append(h("p", { class: "fine", text: "Showing the " + CLOSED_MAX + " most recently updated of " + d.closedTotal + " closed PRs in this range. Pick a shorter range to see the rest." }));
+  }
+  if (!any) {
+    const filtered = S.query || S.repo || S.statusFilter;
+    list.append(h("div", { class: "empty" },
+      h("h2", { text: filtered ? "Nothing matches these filters" : S.tab === "mine" ? "You have no open PRs" : "Nothing is waiting on your review" }),
+      h("p", { text: filtered ? "Clear the search, repository or status filter to see more." : "New PRs show up here when you refresh." })));
+  }
+}
+
+function renderSettings() {
+  const wrap = $("st-list"); wrap.replaceChildren();
+  S.store.statuses.forEach((s, i) => {
+    const label = h("input", { id: "st-label-" + s.key, value: s.label, maxlength: "40", "aria-label": "Status name" });
+    label.addEventListener("change", () => {
+      const v = label.value.trim();
+      if (!v) { label.value = s.label; return; }
+      s.label = v; saveStore(); render();
+    });
+    const tone = h("select", { id: "st-tone-" + s.key, "aria-label": "Color" }, TONES.map((t) => h("option", { value: t, text: t[0].toUpperCase() + t.slice(1) })));
+    tone.value = s.tone;
+    tone.addEventListener("change", () => { s.tone = tone.value; saveStore(); renderSettings(); render(); });
+    const move = (dir) => {
+      const j = i + dir; if (j < 0 || j >= S.store.statuses.length) return;
+      const arr = S.store.statuses; [arr[i], arr[j]] = [arr[j], arr[i]];
+      saveStore(); renderSettings(); render();
+    };
+    const del = h("button", { class: "iconbtn", type: "button", title: "Delete status", "aria-label": "Delete " + s.label }, "✕");
+    del.addEventListener("click", () => {
+      if (S.store.statuses.length <= 1) { toast("Keep at least one status"); return; }
+      if (!del.classList.contains("confirm")) { del.classList.add("confirm"); del.textContent = "Delete?"; return; }
+      S.store.statuses.splice(i, 1);
+      for (const m of Object.values(S.store.prs)) if (m.status === s.key) delete m.status;
+      saveStore(); renderSettings(); render();
+      toast("Deleted " + s.label + ". Its PRs went back to suggested statuses.");
+    });
+    wrap.append(h("div", { class: "st-row tone-" + s.tone },
+      h("span", { class: "dot" }), label, tone,
+      h("span", { class: "ops" },
+        h("button", { class: "iconbtn", type: "button", "aria-label": "Move up", disabled: i === 0, onclick: () => move(-1) }, "↑"),
+        h("button", { class: "iconbtn", type: "button", "aria-label": "Move down", disabled: i === S.store.statuses.length - 1, onclick: () => move(1) }, "↓"),
+        del)));
+  });
+  renderStoreInfo();
+}
+
+// ---------- flows ----------
+let refreshing = null;
+async function refresh() {
+  if (refreshing) return refreshing;
+  S.loading = true; render();
+  refreshing = (async () => {
+    try {
+      await syncStoreFromGist();
+      const r = await fetchPRs();
+      // Keep the previous closed-search results on screen until loadClosed() replaces them.
+      if (S.data) {
+        const ids = new Set([...r.data.mine, ...r.data.review, ...r.data.closed].map((p) => p.id));
+        r.data.closed.push(...S.data.closed.filter((p) => !p.tracked && !ids.has(p.id)));
+        r.data.closedTotal = S.data.closedTotal || 0;
+        r.data.closedKey = S.data.closedKey || "";
+      }
+      S.viewer = r.viewer; S.data = r.data; S.fetchError = null; S.trackMissing = r.missing;
+      LS.set("prb.viewer", S.viewer); LS.set("prb.cache", S.data); LS.set("prb.login", r.viewer.login);
+      pruneTracked();
+      loadClosed();
+    } catch (e) {
+      if (e.kind === "auth") { forgetToken("GitHub rejected the saved token. It may be expired or revoked. Paste a new one."); return; }
+      S.fetchError = e.message;
+    } finally {
+      S.loading = false; refreshing = null;
+      if (S.token) { renderBanner(); if (!S.editingNote) render(); }
+    }
+  })();
+  return refreshing;
+}
+
+// Fetch closed PRs for the chosen window. A newer call (range changed mid-load) wins.
+let closedSeq = 0;
+async function loadClosed() {
+  const seq = ++closedSeq;
+  const win = closedWindow();
+  if (!win || !S.data || !S.viewer) { S.closedLoading = false; S.closedError = null; renderBanner(); render(); return; }
+  S.closedLoading = true; render();
+  try {
+    const c = await fetchClosed(win, S.viewer.login);
+    if (seq !== closedSeq) return;
+    const keep = S.data.closed.filter((p) => p.tracked);
+    const ids = new Set([...S.data.mine, ...S.data.review, ...keep].map((p) => p.id));
+    S.data.closed = [...keep, ...c.list.filter((p) => !ids.has(p.id))];
+    S.data.closedTotal = c.total;
+    S.data.closedKey = closedQualifier(win);
+    S.closedError = null;
+    LS.set("prb.cache", S.data);
+  } catch (e) {
+    if (seq !== closedSeq) return;
+    if (e.kind === "auth") { forgetToken("GitHub rejected the saved token. It may be expired or revoked. Paste a new one."); return; }
+    S.closedError = "Couldn't load closed PRs: " + e.message;
+  } finally {
+    if (seq === closedSeq && S.token) {
+      S.closedLoading = false;
+      renderBanner();
+      if (!S.editingNote) render();
+    }
+  }
+}
+
+// ---------- PRs added by link ----------
+function allLoaded() { return S.data ? [...S.data.mine, ...S.data.review, ...S.data.closed] : []; }
+function sameRef(pr, t) { return pr.number === t.number && pr.repo.toLowerCase() === (t.owner + "/" + t.repo).toLowerCase(); }
+
+// Drop PRs added by link once they've been closed or merged for more than 90 days.
+function pruneTracked() {
+  const cutoff = Date.now() - 90 * 864e5;
+  const loaded = allLoaded();
+  const keep = S.store.tracked.filter((t) => {
+    const pr = loaded.find((p) => sameRef(p, t));
+    if (!pr || pr.state === "OPEN") return true;
+    return new Date(pr.mergedAt || pr.closedAt || pr.updatedAt).getTime() >= cutoff;
+  });
+  if (keep.length !== S.store.tracked.length) { S.store.tracked = keep; saveStore(); }
+}
+
+function untrackPR(pr) {
+  S.store.tracked = S.store.tracked.filter((t) => !sameRef(pr, t));
+  for (const k of ["mine", "review", "closed"]) S.data[k] = S.data[k].filter((p) => p.id !== pr.id);
+  saveStore(); LS.set("prb.cache", S.data);
+  render();
+  toast("Stopped tracking " + pr.repo.split("/")[1] + " #" + pr.number);
+}
+
+function untrackMissing() {
+  const gone = new Set(S.trackMissing.map(trackedRef));
+  S.store.tracked = S.store.tracked.filter((t) => !gone.has(trackedRef(t)));
+  S.trackMissing = [];
+  saveStore(); renderBanner();
+}
+
+function revealPR(pr) {
+  S.tab = pr.kind; LS.set("prb.tab", S.tab);
+  S.statusFilter = null; S.query = ""; $("search").value = ""; S.repo = "";
+  S.collapsed[S.tab + ":" + (pr.state === "OPEN" ? effective(pr).key : "__closed")] = false;
+  LS.set("prb.collapsed", S.collapsed);
+  render();
+  const row = document.querySelector('article[data-id="' + CSS.escape(pr.id) + '"]');
+  if (!row) return;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  row.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+  row.classList.add("flash");
+  setTimeout(() => row.classList.remove("flash"), 1800);
+}
+
+function openAddForm() {
+  $("add-form").hidden = false; $("add-err").hidden = true;
+  $("add-input").focus();
+}
+function closeAddForm() { $("add-form").hidden = true; $("add-input").value = ""; $("add-err").hidden = true; }
+function showAddErr(msg) { const e = $("add-err"); e.textContent = msg; e.hidden = false; }
+
+async function addPR(e) {
+  e.preventDefault();
+  const t = parsePrRef($("add-input").value);
+  $("add-err").hidden = true;
+  if (!t) { showAddErr("Paste a pull request link like https://github.com/owner/repo/pull/123, or owner/repo#123."); return; }
+  const existing = allLoaded().find((p) => sameRef(p, t));
+  if (existing) { closeAddForm(); revealPR(existing); toast("Already on your board"); return; }
+  if (S.store.tracked.length >= 50) { showAddErr("You can add up to 50 PRs by link. Stop tracking one first."); return; }
+  const btn = $("add-submit"); btn.disabled = true; btn.textContent = "Adding…";
+  try {
+    const pr = await fetchOnePR(t);
+    if (!pr) { showAddErr("Couldn't find that PR. Check the link, and that your token can see this repository (for org repos with SSO, authorize the token for that org)."); return; }
+    S.store.tracked.push({ owner: t.owner, repo: t.repo, number: t.number, addedAt: new Date().toISOString() });
+    saveStore();
+    if (!S.data) S.data = { mine: [], review: [], closed: [], fetchedAt: new Date().toISOString() };
+    if (pr.state === "OPEN") S.data[pr.kind].push(pr); else S.data.closed.push(pr);
+    LS.set("prb.cache", S.data);
+    closeAddForm();
+    const win = closedWindow();
+    if (pr.state !== "OPEN" && !(win && inWindow(pr, win))) {
+      render();
+      toast("Added. It's already " + pr.state.toLowerCase() + ", so it shows when the closed-PR dates include the day it closed.");
+      return;
+    }
+    revealPR(pr);
+    toast("Added to " + (pr.kind === "mine" ? "My PRs" : "Needs my review"));
+  } catch (err) {
+    if (err.kind === "auth") { forgetToken("GitHub rejected the saved token. It may be expired or revoked. Paste a new one."); return; }
+    showAddErr(err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "Add";
+  }
+}
+
+function showApp() { $("setup").hidden = true; $("app").hidden = false; render(); renderBanner(); }
+function showSetup(err) {
+  $("app").hidden = true; $("setup").hidden = false;
+  const e = $("token-err"); e.hidden = !err; e.textContent = err || "";
+  $("token-input").focus();
+}
+function forgetToken(msg) {
+  S.token = null; LS.del("prb.token"); LS.del("prb.cache"); LS.del("prb.viewer");
+  S.data = null; S.viewer = null;
+  closeSettings(); showSetup(msg);
+}
+function openSettings() { renderSettings(); $("scrim").hidden = false; $("drawer").hidden = false; $("close-settings").focus(); }
+function closeSettings() { $("scrim").hidden = true; $("drawer").hidden = true; }
+
+$("token-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const v = $("token-input").value.trim();
+  if (!v) return;
+  const btn = $("token-submit"); btn.disabled = true; btn.textContent = "Connecting…";
+  S.token = v;
+  try {
+    const r = await fetchPRs();
+    LS.set("prb.token", v);
+    // A different GitHub account in this browser must not inherit the last account's data.
+    const prevLogin = LS.get("prb.login", null);
+    if (prevLogin && prevLogin !== r.viewer.login) {
+      S.store = cleanStore(null); S.gistId = null; S.gistUrl = null;
+      LS.del("prb.gist"); LS.del("prb.store"); setDirty(false);
+    }
+    LS.set("prb.login", r.viewer.login);
+    S.viewer = r.viewer; S.data = r.data;
+    LS.set("prb.viewer", S.viewer); LS.set("prb.cache", S.data);
+    $("token-input").value = "";
+    showApp();
+    refresh(); // loads statuses from the gist
+  } catch (err) {
+    S.token = null;
+    showSetup(err.kind === "auth" ? "GitHub didn't accept that token. Check you copied all of it." : err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "Connect";
+  }
+});
+
+for (const t of document.querySelectorAll(".tab")) t.addEventListener("click", () => {
+  S.tab = t.dataset.tab; S.statusFilter = null; LS.set("prb.tab", S.tab); render();
+});
+$("search").addEventListener("input", (e) => { S.query = e.target.value.trim(); render(); });
+$("repo").addEventListener("change", (e) => { S.repo = e.target.value; render(); });
+function setClosedRange(patch) {
+  S.closedRange = { ...S.closedRange, ...patch };
+  LS.set("prb.closedRange", S.closedRange);
+  loadClosed();
+}
+$("closed-range").addEventListener("change", (e) => {
+  const mode = e.target.value;
+  // Start a custom range at the last 30 days so it shows something right away.
+  if (mode === "custom" && !S.closedRange.from && !S.closedRange.to) {
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    setClosedRange({ mode, from: ymd(d), to: ymd(new Date()) });
+  } else setClosedRange({ mode });
+});
+$("closed-from").addEventListener("change", (e) => setClosedRange({ from: e.target.value }));
+$("closed-to").addEventListener("change", (e) => setClosedRange({ to: e.target.value }));
+$("refresh").addEventListener("click", refresh);
+$("open-add").addEventListener("click", openAddForm);
+$("add-form").addEventListener("submit", addPR);
+$("add-cancel").addEventListener("click", closeAddForm);
+$("add-input").addEventListener("keydown", (e) => { if (e.key === "Escape") closeAddForm(); });
+$("open-settings").addEventListener("click", openSettings);
+$("close-settings").addEventListener("click", closeSettings);
+$("scrim").addEventListener("click", closeSettings);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("drawer").hidden) closeSettings(); });
+$("add-status").addEventListener("click", () => {
+  let key = slug("custom " + Date.now().toString(36));
+  S.store.statuses.push({ key, label: "New status", tone: TONES[S.store.statuses.length % TONES.length] });
+  saveStore(); renderSettings(); render();
+  const inp = $("st-label-" + key); if (inp) { inp.focus(); inp.select(); }
+});
+$("reset-statuses").addEventListener("click", (e) => {
+  const b = e.currentTarget;
+  if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Click again to reset (custom statuses are removed)"; return; }
+  b.dataset.armed = ""; b.textContent = "Reset to defaults";
+  S.store.statuses = DEFAULT_STATUSES.map((s) => ({ ...s }));
+  const keys = new Set(S.store.statuses.map((s) => s.key));
+  for (const m of Object.values(S.store.prs)) if (m.status && !keys.has(m.status)) delete m.status;
+  saveStore(); renderSettings(); render();
+});
+$("forget-token").addEventListener("click", () => forgetToken(null));
+
+// auto refresh every 5 minutes while visible; also on returning to the tab after 2+ minutes
+setInterval(() => { if (S.token && document.visibilityState === "visible" && !S.editingNote) refresh(); }, 5 * 60 * 1000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && S.token && S.data && Date.now() - new Date(S.data.fetchedAt) > 2 * 60 * 1000) refresh();
+});
+// keep "Updated Xm ago" fresh
+setInterval(() => { if (S.data && !S.loading && !S.editingNote) { const sy = $("synced"); sy.textContent = "Updated " + ago(S.data.fetchedAt); } }, 30 * 1000);
+
+// ---------- boot ----------
+S.store = cleanStore(S.store);
+if (S.token) { showApp(); refresh(); } else showSetup(null);
+</script>
+</body>
+</html>
