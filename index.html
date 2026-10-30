@@ -125,7 +125,7 @@ header.top {
   border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
   padding: 5px 12px 5px 10px; cursor: pointer; font-size: 13px;
 }
-.chip-f .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--muted)); }
+.chip-f .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dot, var(--c, var(--muted))); }
 .chip-f .n { font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .chip-f[aria-pressed="true"] { background: var(--cbg, var(--sunken)); border-color: var(--c, var(--ink)); color: var(--c, var(--ink)); }
 .chip-f[aria-pressed="true"] .n { color: inherit; }
@@ -151,7 +151,7 @@ main { padding-block: 8px 60px; }
   background: none; border: 0; padding: 4px 0 8px; cursor: pointer; text-align: left;
 }
 .group-h h2 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 16px; letter-spacing: -0.005em; }
-.group-h .dot { width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
+.group-h .dot { width: 10px; height: 10px; border-radius: 3px; background: var(--dot, var(--c)); }
 .group-h .n { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
 .group-h .caret { margin-left: auto; color: var(--muted); font-size: 12px; transition: transform .15s; }
 .group.collapsed .caret { transform: rotate(-90deg); }
@@ -231,8 +231,10 @@ main { padding-block: 8px 60px; }
 .drawer h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
 .drawer-head { display: flex; align-items: center; justify-content: space-between; }
 .st-list { display: flex; flex-direction: column; gap: 8px; }
-.st-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) 96px auto; gap: 8px; align-items: center; }
-.st-row .dot { width: 12px; height: 12px; border-radius: 3px; background: var(--c); }
+.st-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) 128px auto; gap: 8px; align-items: center; }
+.st-row .dot { width: 12px; height: 12px; border-radius: 3px; background: var(--dot, var(--c)); }
+.st-color { display: flex; gap: 4px; min-width: 0; }
+.st-row input[type="color"] { flex: 0 0 30px; width: 30px; height: 30px; padding: 2px; cursor: pointer; }
 .st-row input, .st-row select { border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; background: var(--bg); min-width: 0; width: 100%; }
 .st-row .ops { display: flex; gap: 2px; }
 .iconbtn { border: 1px solid transparent; background: none; border-radius: 5px; padding: 3px 6px; cursor: pointer; color: var(--muted); }
@@ -259,6 +261,7 @@ main { padding-block: 8px 60px; }
   .setup { margin: 20px auto; padding: 20px; }
 }
 </style>
+<style id="custom-tones"></style>
 </head>
 <body>
 
@@ -377,6 +380,22 @@ main { padding-block: 8px 60px; }
 "use strict";
 const GIST_FILE = "pr-board-status.json";
 const TONES = ["red", "amber", "violet", "blue", "teal", "green", "pink", "grey"];
+// Other colors are stored as a tone of "x" + hex; syncColorStyles() writes their .tone-x… rules.
+const EXTRA_COLORS = { Orange: "xea580c", Yellow: "xca8a04", Lime: "x65a30d", Cyan: "x0891b2", Indigo: "x4f46e5", Brown: "x92400e" };
+const HEX_TONE = /^x[0-9a-f]{6}$/;
+function isPresetTone(t) { return TONES.includes(t) || Object.values(EXTRA_COLORS).includes(t); }
+function toneHex(t) {
+  if (HEX_TONE.test(t)) return "#" + t.slice(1);
+  return getComputedStyle(document.documentElement).getPropertyValue("--" + t).trim();
+}
+// Label text uses 35% of the chosen color so any color stays readable (5:1 or better) in both themes.
+function syncColorStyles() {
+  const tones = new Set(S.store.statuses.map((s) => s.tone).filter((t) => HEX_TONE.test(t)));
+  $("custom-tones").textContent = [...tones].map((t) => {
+    const c = "#" + t.slice(1);
+    return `.tone-${t} { --dot: ${c}; --c: color-mix(in srgb, ${c} 35%, var(--ink)); --cbg: color-mix(in srgb, ${c} 18%, var(--surface)); }`;
+  }).join("\n");
+}
 const DEFAULT_STATUSES = [
   { key: "pending_me", label: "Pending on me", tone: "red" },
   { key: "test_before_review", label: "Testing pending before review", tone: "amber" },
@@ -442,6 +461,7 @@ const S = {
   storeMode: "loading",                     // loading | gist | local
   storeError: null,
   trackMissing: [],                         // PRs added by link that GitHub couldn't return
+  customPicking: null,                      // status whose Custom color was just chosen in settings
   closedLoading: false,
   closedError: null,
   gistId: LS.get("prb.gist", null),
@@ -659,7 +679,7 @@ async function fetchOnePR(t) {
 function cleanStore(raw) {
   const st = raw && typeof raw === "object" ? raw : {};
   const statuses = Array.isArray(st.statuses) && st.statuses.length
-    ? st.statuses.filter((s) => s && s.key && s.label).map((s) => ({ key: String(s.key), label: String(s.label), tone: TONES.includes(s.tone) ? s.tone : "grey" }))
+    ? st.statuses.filter((s) => s && s.key && s.label).map((s) => ({ key: String(s.key), label: String(s.label), tone: TONES.includes(s.tone) || HEX_TONE.test(s.tone) ? s.tone : "grey" }))
     : DEFAULT_STATUSES.slice();
   const tracked = Array.isArray(st.tracked)
     ? st.tracked.filter((t) => t && t.owner && t.repo && Number.isInteger(t.number)).slice(0, 50)
@@ -936,6 +956,7 @@ function renderStoreInfo() {
 }
 
 function render() {
+  syncColorStyles();
   const d = S.data || { mine: [], review: [], closed: [] };
   $("count-mine").textContent = d.mine.length;
   $("count-review").textContent = d.review.length;
@@ -1026,6 +1047,7 @@ function render() {
 }
 
 function renderSettings() {
+  syncColorStyles();
   const wrap = $("st-list"); wrap.replaceChildren();
   S.store.statuses.forEach((s, i) => {
     const label = h("input", { id: "st-label-" + s.key, value: s.label, maxlength: "40", "aria-label": "Status name" });
@@ -1034,9 +1056,23 @@ function renderSettings() {
       if (!v) { label.value = s.label; return; }
       s.label = v; saveStore(); render();
     });
-    const tone = h("select", { id: "st-tone-" + s.key, "aria-label": "Color" }, TONES.map((t) => h("option", { value: t, text: t[0].toUpperCase() + t.slice(1) })));
-    tone.value = s.tone;
-    tone.addEventListener("change", () => { s.tone = tone.value; saveStore(); renderSettings(); render(); });
+    const tone = h("select", { id: "st-tone-" + s.key, "aria-label": "Color" },
+      TONES.map((t) => h("option", { value: t, text: t[0].toUpperCase() + t.slice(1) })),
+      Object.entries(EXTRA_COLORS).map(([name, t]) => h("option", { value: t, text: name })),
+      h("option", { value: "__custom", text: "Custom…" }));
+    const custom = !isPresetTone(s.tone) || S.customPicking === s.key;
+    tone.value = custom ? "__custom" : s.tone;
+    tone.addEventListener("change", () => {
+      const picking = tone.value === "__custom";
+      S.customPicking = picking ? s.key : null;
+      s.tone = picking ? "x" + toneHex(s.tone).slice(1).toLowerCase() : tone.value;
+      saveStore(); renderSettings(); render();
+      if (!picking) return;
+      const p = $("st-color-" + s.key); p.focus();
+      try { p.showPicker(); } catch {}
+    });
+    const picker = custom ? h("input", { id: "st-color-" + s.key, type: "color", value: toneHex(s.tone), "aria-label": "Custom color for " + s.label }) : null;
+    if (picker) picker.addEventListener("change", () => { s.tone = "x" + picker.value.slice(1).toLowerCase(); saveStore(); renderSettings(); render(); });
     const move = (dir) => {
       const j = i + dir; if (j < 0 || j >= S.store.statuses.length) return;
       const arr = S.store.statuses; [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -1052,7 +1088,7 @@ function renderSettings() {
       toast("Deleted " + s.label + ". Its PRs went back to suggested statuses.");
     });
     wrap.append(h("div", { class: "st-row tone-" + s.tone },
-      h("span", { class: "dot" }), label, tone,
+      h("span", { class: "dot" }), label, h("span", { class: "st-color" }, tone, picker),
       h("span", { class: "ops" },
         h("button", { class: "iconbtn", type: "button", "aria-label": "Move up", disabled: i === 0, onclick: () => move(-1) }, "↑"),
         h("button", { class: "iconbtn", type: "button", "aria-label": "Move down", disabled: i === S.store.statuses.length - 1, onclick: () => move(1) }, "↓"),
